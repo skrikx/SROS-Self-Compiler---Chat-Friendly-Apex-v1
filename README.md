@@ -21,23 +21,7 @@ This repo ships an **SRX ACE v2 agent prompt-spec** (not an executable binary co
 - **SROS v2 Repo**: https://github.com/skrikx/SROS_v2  
 
 ---
-## Try it in 30 seconds (this repo is a prompt-spec)
 
-This repo ships a **chat-first compiler prompt** (XML). It is not a CLI yet.
-
-1) Open any LLM chat tool that supports a **system prompt** (Custom GPT, Claude Project, etc.)
-2) Paste the contents of: `SRX.ACE.SelfCompiler.OSS.ChatFriendly.Apex.v1.xml` as the system prompt
-3) In the chat, type:
-
-```txt
-compile: <your intent here>
-```
-
-You will receive **exactly one sealed XML artifact** (`promptunit_package`) containing:
-- `sr8_prompt` build artifacts
-- receipts (decisions, constraints, checks)
-- a deterministic output contract
-  
 ## What it does
 
 You type:
