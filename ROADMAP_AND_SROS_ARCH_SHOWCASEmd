@@ -1,0 +1,168 @@
+# File: ROADMAP_AND_ARCH_SHOWCASE_SOVEREIGN.md
+
+## SROS v2 - Sovereign Depth Roadmap and Architecture Showcase (OSS)
+
+This file is a public-facing, sovereign-depth overview of the SROS v2 architecture, how the planes work, and a roadmap from OSS compiler prompt-spec to an operational kernel-driven system.
+
+### 1) Architecture at a glance
+High-level flow:
+
+`CLI Input -> SR7 (Intake) -> SR8 (Compiler) -> SRIR (DAG) -> Orchestrator (Engine) -> Runtime (Tools) -> Mirror (Audit) -> Receipts`  :contentReference[oaicite:2]{index=2}
+
+Core components (entrypoints, engines, planes, adapters, MCP, prompt registry) are documented in the architecture map. :contentReference[oaicite:3]{index=3}
+
+### 2) The four-plane model
+SROS v2 is a kernel composed of 4 planes with hard responsibilities:
+- ORCH: orchestration engine and lifecycle
+- GOV: policy gating, approvals, redaction, snapshots
+- MEM: Holocron memory with provenance and contradictions
+- MIRROR: identity baseline, drift detection, enforcement :contentReference[oaicite:4]{index=4}
+
+These planes interact with ORCH as the driver:
+- ORCH requests policy verdicts from GOV
+- ORCH reads/writes context via MEM
+- ORCH runs drift checks via MIRROR :contentReference[oaicite:5]{index=5}
+
+### 3) Boot sequence showcase
+SROS kernel boots in 8 phases:
+INIT -> GOV_BOOT -> MEM_BOOT -> MIRROR_BOOT -> ADAPTERS -> ORCH_BOOT -> VALIDATE -> READY :contentReference[oaicite:6]{index=6}
+
+Public value:
+- The system does not start executing graphs until it validates its plane dependencies and adapter registry.
+
+### 4) Request lifecycle showcase
+Every node executes through a lifecycle that includes:
+- preflight hashing
+- mirror pre-check
+- node-level governance
+- memory read
+- tool-level governance
+- insulation layer
+- tool call
+- execute
+- governance write check
+- memory write
+- mirror post-check
+- receipt emit :contentReference[oaicite:7]{index=7}
+
+Public value:
+- You can show that governance and identity checks are not optional add-ons. They are in the lifecycle.
+
+### 5) Tooling and MCP showcase
+SROS integrates tools through adapters:
+- files, http, browser, MCP
+Adapters sit behind governance and insulation, and every call can be receipted. :contentReference[oaicite:8]{index=8} :contentReference[oaicite:9]{index=9}
+
+MCP support exists as a first-class component (server/client/registry) in the architecture map. :contentReference[oaicite:10]{index=10}
+
+### 6) Data artifacts showcase
+SROS writes artifacts to disk for verification and replay, including:
+- runs directory (execution artifacts)
+- receipts and audit outputs
+- protocols and packs storage :contentReference[oaicite:11]{index=11}
+
+### 7) Sovereign Depth Roadmap
+This roadmap is written for public OSS evolution, not internal-only claims.
+
+#### Phase 0 (Now) - OSS Compiler Prompt-Spec
+Deliver:
+- SRX ACE v2 agent prompt-spec that outputs:
+  - promptunit_package
+  - receipts
+  - sr8_prompt artifacts
+Guarantees:
+- no fake scores
+- optional hashing placeholders
+- URI sanitation
+- governance decisions
+
+#### Phase 1 - Validator and Serialization
+Deliver:
+- CLI validator: checks single-root output, no markdown URIs, no numeric scores
+- JSON and YAML serialization modes (same semantics as XML)
+- Minimal schema documents published in-repo
+
+Receipt:
+- validator run output as a release artifact
+
+#### Phase 2 - SR7 Intake as a real module
+Deliver:
+- SR7: natural language -> structured intent extraction
+- canonical normalization rules
+- intent delta and merge
+
+Receipt:
+- SR7 normalization receipt emitted per run
+
+#### Phase 3 - SR8 Compiler as an executable library
+Deliver:
+- SR8: intent -> SRIR GraphSpec compiler
+- protocol pack loading
+- prompt registry (sr8_prompt templates and variants)
+
+Receipt:
+- SR8 compile receipt includes input intent hash, output graph hash (optional until canonical hashing is implemented)
+
+#### Phase 4 - SRIR DAG and ORCH Engine integration
+Deliver:
+- SRIR DAG format stable
+- ORCH executes DAG with checkpoints and receipts
+- node lifecycle enforced
+
+Receipt:
+- per-node receipts (QC1 style) plus run summary
+
+#### Phase 5 - GOV packs, approvals, redaction, snapshots
+Deliver:
+- policy packs
+- approvals queue
+- redaction pipeline
+- snapshot rules
+
+Receipt:
+- verdict receipts at node and tool stages
+
+#### Phase 6 - MEM Holocron: provenance, contradictions, quarantine
+Deliver:
+- ingest pipeline with provenance edges
+- contradictions detection
+- quarantine lane and pinned facts
+- retrieval router modes (semantic, fts, hybrid, exact) :contentReference[oaicite:12]{index=12}
+
+Receipt:
+- ingest receipts and query receipts, each with provenance references
+
+#### Phase 7 - MIRROR: identity baseline, drift enforcement
+Deliver:
+- identity baseline loader
+- drift events and tripwires
+- enforcement actions (halt, approve, log) :contentReference[oaicite:13]{index=13}
+
+Receipt:
+- mirror pre and mirror post receipts per node
+
+#### Phase 8 - Deterministic replay and canonical hashing
+Deliver:
+- canonical byte serialization of artifacts
+- hash chains for receipts
+- replay modes (guided and strict) :contentReference[oaicite:14]{index=14}
+
+Receipt:
+- replay receipt proving identical outputs across runs for the strict subset
+
+### 8) Public architecture demo script (copy-paste)
+Use this to demo SROS without over-claiming:
+
+1) Show the flow line: CLI -> SR7 -> SR8 -> SRIR -> ORCH -> Tools -> Mirror -> Receipts
+2) Show a boot log: 8 phases to READY
+3) Run a tiny graph:
+   - ingest a doc to MEM
+   - run a governed adapter call
+   - emit receipts
+4) Open receipts.jsonl and show:
+   - GOV verdict
+   - adapter selection
+   - mirror pre/post
+   - final receipt
+
+Everything above maps directly to your architecture docs. :contentReference[oaicite:15]{index=15} :contentReference[oaicite:16]{index=16}
