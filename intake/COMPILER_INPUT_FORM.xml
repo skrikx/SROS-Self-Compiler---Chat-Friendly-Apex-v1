@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<compiler_input_form xmlns="https://sros.cloud/schema/intake/v1" version="1.0.0">
+  <how_to_use>
+    <fast_mode>Start your message with: compile: then write your goal.</fast_mode>
+    <refine_mode>Fill the compiler_input below and paste it back. The compiler will compile it.</refine_mode>
+    <note>This file is copy-paste friendly. It is safe to share publicly.</note>
+  </how_to_use>
+
+  <compiler_input>
+    <goal><![CDATA[One paragraph. What do you want built or produced?]]></goal>
+
+    <deliverables>
+      <item><![CDATA[Pick one or more: website | landing_page | app | mvp | docs | sr8_prompt | srx_ace_agent | promptunit_package | other]]></item>
+    </deliverables>
+
+    <constraints>
+      <item><![CDATA[Hard constraints: local-only, no web, stack, pages, deadline, data privacy rules, etc.]]></item>
+    </constraints>
+
+    <style_preferences>
+      <item><![CDATA[Optional: brand colors, typography, motion, tone, references.]]></item>
+    </style_preferences>
+
+    <runtime>
+      <capabilities>
+        <tools>false</tools>
+        <web>false</web>
+        <vision>false</vision>
+        <audio>false</audio>
+        <video>false</video>
+        <documents>false</documents>
+      </capabilities>
+      <notes><![CDATA[Set true only if your chat supports it. The compiler will select adapters accordingly.]]></notes>
+    </runtime>
+  </compiler_input>
+</compiler_input_form>
