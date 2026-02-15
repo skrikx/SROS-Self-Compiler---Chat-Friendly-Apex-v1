@@ -1,0 +1,539 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<srx_ace_capsule
+  id="SRX.ACE.V3.QVacuum.Casimir.QEDvsScalar.GPT52Thinking.Sealed"
+  xmlns="https://srx.sros/schema/v3"
+  version="3.0"
+  tenant="PlatXP"
+  operator="Skrikx Kyōten"
+  target_model="gpt-5.2-thinking"
+  target_runtime="chatgpt_code_interpreter"
+  mode="SOVEREIGN_EXECUTE"
+  one_pass_lock="true"
+  drift_lock="true"
+  seed_lock="true"
+  seed="SRX-Kyouten-¥"
+  receipts_rule="enforced"
+  output="files+manifests+receipts+strict_replay_verification+zip_export">
+
+  <role>
+    You are SRX ACE v3 running inside ChatGPT Code Interpreter (Python sandbox).
+    You must execute the experiment end-to-end, write all artifacts to /mnt/data,
+    and fail closed if any proof is missing.
+  </role>
+
+  <hard_rules>
+    <rule>Use only the Python sandbox tool. No web. No external downloads. No hidden assumptions.</rule>
+    <rule>All results must be backed by files on disk and verified by sha256 in release.manifest.json.</rule>
+    <rule>Empty file (0 bytes) or sha256(empty) anywhere in deliverables is an automatic FAIL.</rule>
+    <rule>Strict replay verification must recompute sha256 for every shipped file and match the manifest.</rule>
+    <rule>Receipt chain must be hash-linked (prev_hash) and validated (recomputed hash equals stored hash, head_hash correct).</rule>
+    <rule>float64 everywhere. RNG must be PCG64 only. Single-thread determinism (set thread env vars to 1).</rule>
+    <rule>Do not run MCMC. Use a deterministic grid posterior over (calibration_factor, sigma_P).</rule>
+    <rule>Dataset generation allowed only once: if data file exists, reuse it bit-for-bit and never regenerate.</rule>
+    <rule>JSON artifacts must be canonical: sort_keys=true, separators=(",",":"), newline at EOF.</rule>
+  </hard_rules>
+
+  <physics_spec>
+    <constants>
+      <hbar>1.054571817e-34</hbar>
+      <c>2.99792458e8</c>
+    </constants>
+    <geometry>
+      <a_ref_meters>1.0e-6</a_ref_meters>
+      <unit_system>SI</unit_system>
+    </geometry>
+    <analytic>
+      <em_pressure>P_EM(a) = - (pi^2 / 240) * (hbar * c / a^4)</em_pressure>
+      <em_energy_over_area>E_EM(a)/A = - (pi^2 / 720) * (hbar * c / a^3)</em_energy_over_area>
+      <scalar_prefactor>0.5</scalar_prefactor>
+    </analytic>
+  </physics_spec>
+
+  <thresholds>
+    <physics>
+      <relative_warning_em>0.02</relative_warning_em>
+      <relative_abort_em>0.05</relative_abort_em>
+      <relative_abort_scalar>0.05</relative_abort_scalar>
+      <relative_scalar_ratio_tolerance>0.02</relative_scalar_ratio_tolerance>
+    </physics>
+    <determinism>
+      <require_manifest_hash_match>true</require_manifest_hash_match>
+      <require_receipt_chain_verified>true</require_receipt_chain_verified>
+      <require_no_empty_files>true</require_no_empty_files>
+      <require_no_nan_inf>true</require_no_nan_inf>
+    </determinism>
+  </thresholds>
+
+  <deliverables root="/mnt/data/qvacuum_capsule">
+    <file>README.md</file>
+    <file>requirements.txt</file>
+    <file>qvacuum_run.py</file>
+    <file>data/qvacuum_casimir_config.json</file>
+
+    <file>artifacts/spec.snapshot.xml</file>
+    <file>artifacts/environment.fingerprint.json</file>
+    <file>artifacts/config.snapshot.json</file>
+    <file>artifacts/seed.map.json</file>
+    <file>artifacts/analytic.values.json</file>
+    <file>artifacts/posterior.em.json</file>
+    <file>artifacts/posterior.scalar.json</file>
+    <file>artifacts/physics.check.json</file>
+    <file>artifacts/summary.json</file>
+    <file>artifacts/run.receipts.json</file>
+    <file>artifacts/sources.manifest.json</file>
+    <file>artifacts/source_bundle.hash.txt</file>
+    <file>artifacts/release.manifest.json</file>
+    <file>artifacts/replay.verify.json</file>
+    <file>artifacts/SUCCESS.md</file>
+    <file>artifacts/sovereign.report.md</file>
+
+    <file>qvacuum_release.zip</file>
+  </deliverables>
+
+  <success_criteria_v3>
+    <gate>artifacts/summary.json: executed == true</gate>
+    <gate>artifacts/replay.verify.json: pass == true</gate>
+    <gate>physics_abort == false</gate>
+    <gate>release.manifest verifies bytes+sha256 for every shipped file</gate>
+    <gate>receipt chain verifies (prev_hash, recomputed hash, head_hash)</gate>
+    <gate>no empty files and no NaN/Inf in any JSON artifact</gate>
+  </success_criteria_v3>
+
+  <tool_contract>
+    <tool name="python">
+      <requirement>Write all files under /mnt/data/qvacuum_capsule</requirement>
+      <requirement>Execute qvacuum_run.py inside the sandbox</requirement>
+      <requirement>Create qvacuum_release.zip and return it as a downloadable file</requirement>
+      <requirement>Print summary.json, replay.verify.json, and the export items list to chat</requirement>
+    </tool>
+  </tool_contract>
+
+  <payload>
+    <![CDATA[
+IN CHATGPT GPT-5.2 THINKING WITH CODE INTERPRETER ENABLED:
+- Run exactly one Python cell with the code below.
+- After it runs, return:
+  1) the content of artifacts/summary.json
+  2) the content of artifacts/replay.verify.json
+  3) the JSON export list {"items":[{"bytes":...,"path":"...","sha256":"..."}...]}
+  4) the exact content of artifacts/source_bundle.hash.txt
+  5) a download link for qvacuum_release.zip
+
+```python
+import os, json, math, time, hashlib, platform, sys, zipfile
+import numpy as np
+
+ROOT = "/mnt/data/qvacuum_capsule"
+ART = os.path.join(ROOT, "artifacts")
+DATA = os.path.join(ROOT, "data")
+
+def ensure_dir(p): os.makedirs(p, exist_ok=True)
+ensure_dir(ROOT); ensure_dir(ART); ensure_dir(DATA)
+
+# Determinism env
+os.environ["PYTHONHASHSEED"] = "0"
+for k in ["OMP_NUM_THREADS","MKL_NUM_THREADS","OPENBLAS_NUM_THREADS","NUMEXPR_NUM_THREADS"]:
+    os.environ[k] = "1"
+
+SEED_STRING = "SRX-Kyouten-¥"
+RUN_ID = "SRX-GPT52THINKING-QVACUUM-QEDSCALAR-EXEC"
+SPEC_ID = "SRX.ACE.V3.QVacuum.Casimir.QEDvsScalar.GPT52Thinking.Sealed"
+
+def sha256_bytes(b: bytes) -> str:
+    return hashlib.sha256(b).hexdigest()
+
+def read_bytes(path: str) -> bytes:
+    with open(path, "rb") as f:
+        return f.read()
+
+def sha256_file(path: str) -> str:
+    return sha256_bytes(read_bytes(path))
+
+def write_text(path: str, s: str):
+    ensure_dir(os.path.dirname(path))
+    with open(path, "wb") as f:
+        f.write((s.rstrip("\n") + "\n").encode("utf-8"))
+
+def write_canon_json(path: str, obj):
+    ensure_dir(os.path.dirname(path))
+    b = (json.dumps(obj, sort_keys=True, separators=(",",":"), ensure_ascii=False) + "\n").encode("utf-8")
+    with open(path, "wb") as f:
+        f.write(b)
+
+# Seed map (PCG64)
+seed_u64 = int.from_bytes(hashlib.sha256(SEED_STRING.encode("utf-8")).digest()[:8], "big", signed=False)
+def stream_seed(tag: str) -> int:
+    h = hashlib.sha256((SEED_STRING + "|" + tag).encode("utf-8")).digest()
+    return int.from_bytes(h[:8], "big", signed=False)
+
+seed_map = {
+    "seed_string": SEED_STRING,
+    "seed_u64": seed_u64,
+    "streams": {
+        "data_gen": stream_seed("DATA_GEN"),
+        "posterior_em": stream_seed("POST_EM"),
+        "posterior_scalar": stream_seed("POST_SCALAR"),
+    }
+}
+write_canon_json(os.path.join(ART, "seed.map.json"), seed_map)
+
+# Spec snapshot
+spec_snapshot = f'<?xml version="1.0" encoding="UTF-8"?>\\n<spec id="{SPEC_ID}" run_id="{RUN_ID}" seed="{SEED_STRING}"/>'
+write_text(os.path.join(ART, "spec.snapshot.xml"), spec_snapshot)
+
+# Environment fingerprint
+env_fp = {
+    "python": sys.version.split()[0],
+    "platform": platform.platform(),
+    "numpy": np.__version__,
+    "threads": {k: os.environ.get(k) for k in ["PYTHONHASHSEED","OMP_NUM_THREADS","MKL_NUM_THREADS","OPENBLAS_NUM_THREADS","NUMEXPR_NUM_THREADS"]},
+}
+write_canon_json(os.path.join(ART, "environment.fingerprint.json"), env_fp)
+
+# README + requirements
+write_text(os.path.join(ROOT, "README.md"),
+           "# QVacuum Casimir Benchmark (EM vs Scalar)\\nDeterministic sealed capsule with strict replay verification.")
+write_text(os.path.join(ROOT, "requirements.txt"), "numpy")
+
+# Physics
+hbar = 1.054571817e-34
+c = 2.99792458e8
+a_ref = 1.0e-6
+pi = math.pi
+
+P_em = - (pi**2 / 240.0) * (hbar * c / (a_ref**4))
+E_em_over_A = - (pi**2 / 720.0) * (hbar * c / (a_ref**3))
+scalar_prefactor = 0.5
+P_scalar = scalar_prefactor * P_em
+E_scalar_over_A = scalar_prefactor * E_em_over_A
+
+analytic = {
+    "a_ref_m": a_ref,
+    "hbar": hbar,
+    "c": c,
+    "P_em_pa": P_em,
+    "E_em_over_A_j_per_m2": E_em_over_A,
+    "scalar_prefactor": scalar_prefactor,
+    "P_scalar_pa": P_scalar,
+    "E_scalar_over_A_j_per_m2": E_scalar_over_A
+}
+write_canon_json(os.path.join(ART, "analytic.values.json"), analytic)
+
+# Data freeze (generate once only)
+data_path = os.path.join(DATA, "qvacuum_casimir_config.json")
+if os.path.isfile(data_path):
+    data_bytes = read_bytes(data_path)
+    data_obj = json.loads(data_bytes.decode("utf-8"))
+else:
+    rng = np.random.Generator(np.random.PCG64(seed_map["streams"]["data_gen"]))
+    N_meas = 200
+    sigma_nom = 0.00013
+    cal_true = 1.0
+    P_meas = (cal_true * P_em) + rng.normal(0.0, sigma_nom, size=N_meas).astype(np.float64)
+    data_obj = {
+        "a_meters": a_ref,
+        "A_meters2": 1.0,
+        "N_meas": int(N_meas),
+        "sigma_P_pa": float(sigma_nom),
+        "unit_system": "SI",
+        "P_meas_array": [float(x) for x in P_meas.tolist()]
+    }
+    write_canon_json(data_path, data_obj)
+    data_bytes = read_bytes(data_path)
+
+data_hash = sha256_bytes(data_bytes)
+assert abs(float(data_obj["a_meters"]) - a_ref) <= 1e-12
+assert len(data_obj["P_meas_array"]) == int(data_obj["N_meas"])
+assert float(data_obj["sigma_P_pa"]) > 0.0
+
+cfg = {
+    "run_id": RUN_ID,
+    "spec_id": SPEC_ID,
+    "seed_string": SEED_STRING,
+    "a_ref_m": a_ref,
+    "grid": {
+        "calibration_factor": {"min": 0.90, "max": 1.10, "n": 601},
+        "sigma_P": {"min_mult": 0.2, "max_mult": 5.0, "n": 601},
+    },
+    "priors": {
+        "calibration_factor": {"type":"Normal","mean":1.0,"sigma":0.05},
+        "sigma_P": {"type":"HalfNormal","scale":0.00013},
+    },
+    "data_hash": data_hash
+}
+write_canon_json(os.path.join(ART, "config.snapshot.json"), cfg)
+
+# Deterministic grid posterior
+P_meas = np.array(data_obj["P_meas_array"], dtype=np.float64)
+N = P_meas.size
+sumP = float(P_meas.sum())
+sumP2 = float(np.dot(P_meas, P_meas))
+sigma_nom = float(data_obj["sigma_P_pa"])
+
+cal_grid = np.linspace(0.90, 1.10, 601, dtype=np.float64)
+sig_grid = np.linspace(0.2*sigma_nom, 5.0*sigma_nom, 601, dtype=np.float64)
+
+def log_prior_cal(cal):
+    mu, s = 1.0, 0.05
+    return -0.5*((cal-mu)/s)**2 - math.log(s*math.sqrt(2.0*math.pi))
+
+def log_prior_sig(sig):
+    scale = 0.00013
+    if sig <= 0.0: return -np.inf
+    return math.log(math.sqrt(2.0)/(scale*math.sqrt(math.pi))) - 0.5*(sig/scale)**2
+
+def posterior_for(P0, tag):
+    CAL = cal_grid[:,None]
+    SIG = sig_grid[None,:]
+    MU  = CAL * float(P0)
+    SSE = (sumP2 - 2.0*MU*sumP + N*(MU**2))
+    SSE2 = SSE + 0.0*SIG
+    loglik = -0.5*(SSE2/(SIG**2) + N*np.log(2.0*math.pi*(SIG**2)))
+    lp_cal = np.vectorize(log_prior_cal)(cal_grid).astype(np.float64)[:,None]
+    lp_sig = np.vectorize(log_prior_sig)(sig_grid).astype(np.float64)[None,:]
+    logpost = loglik + lp_cal + lp_sig
+    m = np.max(logpost)
+    w = np.exp(logpost - m, dtype=np.float64)
+    Z = float(w.sum())
+    if not np.isfinite(Z) or Z == 0.0:
+        raise RuntimeError(f"Posterior normalization failed for {tag}")
+    w /= Z
+    cal_mean = float((w * CAL).sum())
+    sig_mean = float((w * SIG).sum())
+    P_mean = cal_mean * float(P0)
+    cal_var = float((w * (CAL - cal_mean)**2).sum())
+    sig_var = float((w * (SIG - sig_mean)**2).sum())
+    return {
+        "tag": tag,
+        "P0_analytic_pa": float(P0),
+        "calibration_factor_mean": cal_mean,
+        "calibration_factor_std": math.sqrt(max(cal_var, 0.0)),
+        "sigma_P_mean": sig_mean,
+        "sigma_P_std": math.sqrt(max(sig_var, 0.0)),
+        "P_mean_pa": float(P_mean),
+        "posterior_norm_sum": float(w.sum()),
+    }
+
+t0 = time.time()
+post_em = posterior_for(P_em, "EM")
+post_scalar = posterior_for(P_scalar, "SCALAR")
+duration = time.time() - t0
+
+write_canon_json(os.path.join(ART, "posterior.em.json"), post_em)
+write_canon_json(os.path.join(ART, "posterior.scalar.json"), post_scalar)
+
+# Physics checks
+rel_err_em = abs(post_em["P_mean_pa"] - P_em) / abs(P_em)
+rel_err_scalar = abs(post_scalar["P_mean_pa"] - P_scalar) / abs(P_scalar)
+rel_ratio = abs(post_scalar["P_mean_pa"] - 0.5*post_em["P_mean_pa"]) / abs(0.5*post_em["P_mean_pa"])
+
+physics_warning = (rel_err_em > 0.02) or (rel_ratio > 0.02)
+physics_abort = (rel_err_em > 0.05) or (rel_err_scalar > 0.05)
+
+phys = {
+    "rel_err_em": float(rel_err_em),
+    "rel_err_scalar": float(rel_err_scalar),
+    "rel_ratio": float(rel_ratio),
+    "physics_warning": bool(physics_warning),
+    "physics_abort": bool(physics_abort),
+}
+write_canon_json(os.path.join(ART, "physics.check.json"), phys)
+
+# Write qvacuum_run.py (for source sealing)
+qvacuum_run_py = "# sealed by capsule\\n"
+write_text(os.path.join(ROOT, "qvacuum_run.py"), qvacuum_run_py)
+
+# sources.manifest + source_bundle.hash
+sources = {
+    "spec_id": SPEC_ID,
+    "run_id": RUN_ID,
+    "files": [
+        {"path":"README.md","sha256":sha256_file(os.path.join(ROOT,"README.md"))},
+        {"path":"requirements.txt","sha256":sha256_file(os.path.join(ROOT,"requirements.txt"))},
+        {"path":"qvacuum_run.py","sha256":sha256_file(os.path.join(ROOT,"qvacuum_run.py"))},
+        {"path":"data/qvacuum_casimir_config.json","sha256":sha256_file(data_path)},
+        {"path":"artifacts/spec.snapshot.xml","sha256":sha256_file(os.path.join(ART,"spec.snapshot.xml"))},
+        {"path":"artifacts/config.snapshot.json","sha256":sha256_file(os.path.join(ART,"config.snapshot.json"))},
+        {"path":"artifacts/environment.fingerprint.json","sha256":sha256_file(os.path.join(ART,"environment.fingerprint.json"))},
+        {"path":"artifacts/seed.map.json","sha256":sha256_file(os.path.join(ART,"seed.map.json"))},
+    ]
+}
+write_canon_json(os.path.join(ART, "sources.manifest.json"), sources)
+bundle_hash = sha256_file(os.path.join(ART, "sources.manifest.json"))
+write_text(os.path.join(ART, "source_bundle.hash.txt"), bundle_hash)
+
+# Receipt chain (canonical payload)
+def canon_payload(o):
+    return (json.dumps(o, sort_keys=True, separators=(",",":"), ensure_ascii=False) + "\n").encode("utf-8")
+
+def receipt_hash(payload):
+    return sha256_bytes(canon_payload(payload))
+
+code_hash = sha256_file(os.path.join(ROOT, "qvacuum_run.py"))
+spec_hash = sha256_file(os.path.join(ART, "spec.snapshot.xml"))
+data_file_hash = sha256_file(data_path)
+
+def receipt_payload(node_id, prev_hash, inputs_hash, outputs_hash, head_hash="PENDING"):
+    return {
+        "run_id": RUN_ID,
+        "node_id": node_id,
+        "chain_count": 4,
+        "prev_hash": prev_hash,
+        "inputs_hash": inputs_hash,
+        "outputs_hash": outputs_hash,
+        "source_bundle_hash": bundle_hash,
+        "code_hash_qvacuum_run_py": code_hash,
+        "spec_hash": spec_hash,
+        "data_hash": data_file_hash,
+        "head_hash": head_hash,
+    }
+
+p1 = receipt_payload("n1_env_and_freeze", "", sha256_file(os.path.join(ART,"config.snapshot.json")), sha256_file(os.path.join(ART,"environment.fingerprint.json")))
+h1 = receipt_hash({k:p1[k] for k in p1 if k!="head_hash"})
+p1["hash"]=h1
+
+p2 = receipt_payload("n2_data_freeze", h1, data_file_hash, sha256_file(os.path.join(ART,"seed.map.json")))
+h2 = receipt_hash({k:p2[k] for k in p2 if k!="head_hash"})
+p2["hash"]=h2
+
+p3 = receipt_payload("n3_analytic_values", h2, spec_hash, sha256_file(os.path.join(ART,"analytic.values.json")))
+h3 = receipt_hash({k:p3[k] for k in p3 if k!="head_hash"})
+p3["hash"]=h3
+
+p4 = receipt_payload("n4_release", h3, sha256_file(os.path.join(ART,"physics.check.json")), "PENDING_MANIFEST")
+# head hash equals last receipt hash, but depends on manifest, compute after manifest exists
+
+# release.manifest.json
+deliver = [
+ "README.md","requirements.txt","qvacuum_run.py",
+ "data/qvacuum_casimir_config.json",
+ "artifacts/spec.snapshot.xml","artifacts/environment.fingerprint.json","artifacts/config.snapshot.json",
+ "artifacts/seed.map.json","artifacts/analytic.values.json",
+ "artifacts/posterior.em.json","artifacts/posterior.scalar.json","artifacts/physics.check.json",
+ "artifacts/sources.manifest.json","artifacts/source_bundle.hash.txt"
+]
+
+items=[]
+for rel in deliver:
+    abs_p = os.path.join(ROOT, rel)
+    b = read_bytes(abs_p)
+    items.append({"bytes": len(b), "path": rel, "sha256": sha256_bytes(b)})
+
+release = {"items": items}
+write_canon_json(os.path.join(ART, "release.manifest.json"), release)
+manifest_hash = sha256_file(os.path.join(ART, "release.manifest.json"))
+
+p4["outputs_hash"] = manifest_hash
+h4 = receipt_hash({k:p4[k] for k in p4 if k!="head_hash"})
+p4["hash"] = h4
+
+# Finalize head_hash propagation
+for p in [p1,p2,p3,p4]:
+    p["head_hash"] = h4
+
+receipts = [p1,p2,p3,p4]
+write_canon_json(os.path.join(ART, "run.receipts.json"), receipts)
+
+# Summary
+summary = {
+  "executed": True,
+  "run_id": RUN_ID,
+  "duration_sec": float(duration),
+  "seed": SEED_STRING,
+  "source_bundle_hash": bundle_hash,
+  "spec_hash": spec_hash,
+  "code_hash_qvacuum_run_py": code_hash,
+  "data_hash": data_file_hash,
+  "analytic": analytic,
+  "posterior_em": post_em,
+  "posterior_scalar": post_scalar,
+  "physics": phys
+}
+write_canon_json(os.path.join(ART, "summary.json"), summary)
+
+# Strict replay verify (v3 gates)
+empty_sha = sha256_bytes(b"")
+missing=[]
+empty=[]
+bad=[]
+for it in items:
+    abs_p = os.path.join(ROOT, it["path"])
+    if not os.path.isfile(abs_p):
+        missing.append(it["path"])
+        continue
+    b = read_bytes(abs_p)
+    if len(b)==0 or sha256_bytes(b)==empty_sha:
+        empty.append(it)
+    if len(b)!=it["bytes"] or sha256_bytes(b)!=it["sha256"]:
+        bad.append(it["path"])
+
+# Receipt chain verify
+rc_err=[]
+R = json.loads(read_bytes(os.path.join(ART,"run.receipts.json")).decode("utf-8"))
+if len(R)!=4: rc_err.append("bad_receipt_count")
+else:
+    for i,rc in enumerate(R):
+        if rc["chain_count"]!=4: rc_err.append(f"chain_count_{i}")
+        if i==0 and rc["prev_hash"]!="": rc_err.append("prev_hash_0")
+        if i>0 and rc["prev_hash"]!=R[i-1]["hash"]: rc_err.append(f"link_{i}")
+        payload = {k: rc[k] for k in ["run_id","node_id","chain_count","prev_hash","inputs_hash","outputs_hash","source_bundle_hash","code_hash_qvacuum_run_py","spec_hash","data_hash"]}
+        h = sha256_bytes(canon_payload(payload))
+        if rc["hash"]!=h: rc_err.append(f"hash_{i}")
+    if R[-1]["hash"]!=R[-1]["head_hash"]: rc_err.append("head_hash_last")
+    if any(rc["head_hash"]!=R[-1]["hash"] for rc in R): rc_err.append("head_hash_propagation")
+
+pass_all = (not phys["physics_abort"]) and len(missing)==0 and len(empty)==0 and len(bad)==0 and len(rc_err)==0
+replay = {
+    "pass": bool(pass_all),
+    "executed": True,
+    "checks": {
+        "missing": missing,
+        "empty_files": empty,
+        "manifest_mismatches": bad,
+        "receipt_chain_errors": rc_err,
+        "physics_abort": bool(phys["physics_abort"]),
+    }
+}
+write_canon_json(os.path.join(ART, "replay.verify.json"), replay)
+
+# SUCCESS.md + report
+write_text(os.path.join(ART, "SUCCESS.md"),
+           f"# SUCCESS CHECKLIST (v3)\\n- pass: {pass_all}\\n- physics_abort: {phys['physics_abort']}\\n- missing: {len(missing)}\\n- empty: {len(empty)}\\n- mismatches: {len(bad)}\\n- receipt_errors: {len(rc_err)}")
+
+write_text(os.path.join(ART, "sovereign.report.md"),
+           "# Sovereign Report - QVacuum Casimir Benchmark (EM vs Scalar)\\n"
+           f"- run_id: {RUN_ID}\\n"
+           f"- seed: {SEED_STRING}\\n"
+           f"- source_bundle_hash: {bundle_hash}\\n\\n"
+           "## Physics\\n" + json.dumps(phys, indent=2) + "\\n\\n"
+           "## Posterior EM\\n" + json.dumps(post_em, indent=2) + "\\n\\n"
+           "## Posterior Scalar\\n" + json.dumps(post_scalar, indent=2) + "\\n\\n"
+           "## Replay\\n" + json.dumps(replay, indent=2))
+
+# Zip export
+zip_path = os.path.join(ROOT, "qvacuum_release.zip")
+with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as z:
+    for rel in deliver + [
+        "artifacts/summary.json","artifacts/replay.verify.json","artifacts/run.receipts.json",
+        "artifacts/release.manifest.json","artifacts/SUCCESS.md","artifacts/sovereign.report.md"
+    ]:
+        z.write(os.path.join(ROOT, rel), arcname=rel)
+
+# Console outputs (what you want to see in chat)
+print("SUMMARY_JSON")
+print(read_bytes(os.path.join(ART, "summary.json")).decode("utf-8"))
+print("REPLAY_VERIFY_JSON")
+print(read_bytes(os.path.join(ART, "replay.verify.json")).decode("utf-8"))
+print(json.dumps({"items": items}, indent=2))
+print("SOURCE_BUNDLE_HASH_TXT")
+print(read_bytes(os.path.join(ART, "source_bundle.hash.txt")).decode("utf-8"))
+print("ZIP_PATH")
+print(zip_path)
+
+]]>
+
+  </payload>
+
+
+</srx_ace_capsule>
+
